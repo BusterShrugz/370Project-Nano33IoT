@@ -1,0 +1,407 @@
+Solo in src/: cbor.dox
+diff --unified --recursive --no-dereference src/cborencoder.c /home/pennam/Arduino/libraries/Arduino_CloudUtils/src/tinycbor/src/cborencoder.c
+--- src/cborencoder.c	2024-12-03 11:54:08.834581955 +0100
++++ /home/pennam/Arduino/libraries/Arduino_CloudUtils/src/tinycbor/src/cborencoder.c	2024-12-03 11:32:10.786552470 +0100
+@@ -39,6 +39,9 @@
+ #include <stdlib.h>
+ #include <string.h>
+ 
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wpedantic"
++
+ /**
+  * \defgroup CborEncoding Encoding to CBOR
+  * \brief Group of functions used to encode data to CBOR.
+@@ -642,4 +645,6 @@
+  * \sa cbor_encoder_init(), cbor_encoder_get_buffer_size(), CborEncoding
+  */
+ 
++#pragma GCC diagnostic pop
++
+ /** @} */
+diff --unified --recursive --no-dereference src/cborencoder_close_container_checked.c /home/pennam/Arduino/libraries/Arduino_CloudUtils/src/tinycbor/src/cborencoder_close_container_checked.c
+--- src/cborencoder_close_container_checked.c	2024-12-03 11:54:08.834581955 +0100
++++ /home/pennam/Arduino/libraries/Arduino_CloudUtils/src/tinycbor/src/cborencoder_close_container_checked.c	2024-12-03 11:32:10.786552470 +0100
+@@ -30,6 +30,9 @@
+ 
+ #include "cbor.h"
+ 
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wpedantic"
++
+ /**
+  * \addtogroup CborEncoding
+  * @{
+@@ -54,4 +57,6 @@
+     return cbor_encoder_close_container(encoder, containerEncoder);
+ }
+ 
++#pragma GCC diagnostic pop
++
+ /** @} */
+diff --unified --recursive --no-dereference src/cborerrorstrings.c /home/pennam/Arduino/libraries/Arduino_CloudUtils/src/tinycbor/src/cborerrorstrings.c
+--- src/cborerrorstrings.c	2024-12-03 11:54:08.834581955 +0100
++++ /home/pennam/Arduino/libraries/Arduino_CloudUtils/src/tinycbor/src/cborerrorstrings.c	2024-12-03 11:32:10.786552470 +0100
+@@ -28,6 +28,9 @@
+ #  define _(msg)    msg
+ #endif
+ 
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wpedantic"
++
+ /**
+  * \enum CborError
+  * \ingroup CborGlobals
+@@ -160,6 +163,9 @@
+     case CborErrorTooFewItems:
+         return _("too few items added to encoder");
+ 
++    case CborErrorSplitItems:
++        return _("splitted item added to encoder");
++
+     case CborErrorDataTooLarge:
+         return _("internal error: data too large");
+ 
+@@ -180,3 +186,5 @@
+     }
+     return cbor_error_string(CborUnknownError);
+ }
++
++#pragma GCC diagnostic pop
+diff --unified --recursive --no-dereference src/cbor.h /home/pennam/Arduino/libraries/Arduino_CloudUtils/src/tinycbor/src/cbor.h
+--- src/cbor.h	2024-12-03 11:54:08.834581955 +0100
++++ /home/pennam/Arduino/libraries/Arduino_CloudUtils/src/tinycbor/src/cbor.h	2024-12-03 11:32:10.786552470 +0100
+@@ -184,6 +184,7 @@
+     /* encoder errors */
+     CborErrorTooManyItems = 768,
+     CborErrorTooFewItems,
++    CborErrorSplitItems,
+ 
+     /* internal implementation errors */
+     CborErrorDataTooLarge = 1024,
+@@ -329,7 +330,9 @@
+ { return value->type == CborBooleanType; }
+ CBOR_INLINE_API CborError cbor_value_get_boolean(const CborValue *value, bool *result)
+ {
++#ifdef HOST
+     assert(cbor_value_is_boolean(value));
++#endif
+     *result = !!value->extra;
+     return CborNoError;
+ }
+@@ -339,7 +342,9 @@
+ { return value->type == CborSimpleType; }
+ CBOR_INLINE_API CborError cbor_value_get_simple_type(const CborValue *value, uint8_t *result)
+ {
++#ifdef HOST
+     assert(cbor_value_is_simple_type(value));
++#endif
+     *result = (uint8_t)value->extra;
+     return CborNoError;
+ }
+@@ -354,21 +359,27 @@
+ 
+ CBOR_INLINE_API CborError cbor_value_get_raw_integer(const CborValue *value, uint64_t *result)
+ {
++#ifdef HOST
+     assert(cbor_value_is_integer(value));
++#endif
+     *result = _cbor_value_extract_int64_helper(value);
+     return CborNoError;
+ }
+ 
+ CBOR_INLINE_API CborError cbor_value_get_uint64(const CborValue *value, uint64_t *result)
+ {
++#ifdef HOST
+     assert(cbor_value_is_unsigned_integer(value));
++#endif
+     *result = _cbor_value_extract_int64_helper(value);
+     return CborNoError;
+ }
+ 
+ CBOR_INLINE_API CborError cbor_value_get_int64(const CborValue *value, int64_t *result)
+ {
++#ifdef HOST
+     assert(cbor_value_is_integer(value));
++#endif
+     *result = (int64_t) _cbor_value_extract_int64_helper(value);
+     if (value->flags & CborIteratorFlag_NegativeInteger)
+         *result = -*result - 1;
+@@ -377,7 +388,9 @@
+ 
+ CBOR_INLINE_API CborError cbor_value_get_int(const CborValue *value, int *result)
+ {
++#ifdef HOST
+     assert(cbor_value_is_integer(value));
++#endif
+     *result = (int) _cbor_value_extract_int64_helper(value);
+     if (value->flags & CborIteratorFlag_NegativeInteger)
+         *result = -*result - 1;
+@@ -395,7 +408,9 @@
+ { return value->type == CborTagType; }
+ CBOR_INLINE_API CborError cbor_value_get_tag(const CborValue *value, CborTag *result)
+ {
++#ifdef HOST
+     assert(cbor_value_is_tag(value));
++#endif
+     *result = _cbor_value_extract_int64_helper(value);
+     return CborNoError;
+ }
+@@ -410,7 +425,9 @@
+ CBOR_INLINE_API CborError cbor_value_get_string_length(const CborValue *value, size_t *length)
+ {
+     uint64_t v;
++#ifdef HOST
+     assert(cbor_value_is_byte_string(value) || cbor_value_is_text_string(value));
++#endif
+     if (!cbor_value_is_length_known(value))
+         return CborErrorUnknownLength;
+     v = _cbor_value_extract_int64_helper(value);
+@@ -430,26 +447,34 @@
+ CBOR_INLINE_API CborError cbor_value_copy_text_string(const CborValue *value, char *buffer,
+                                                       size_t *buflen, CborValue *next)
+ {
++#ifdef HOST
+     assert(cbor_value_is_text_string(value));
++#endif
+     return _cbor_value_copy_string(value, buffer, buflen, next);
+ }
+ CBOR_INLINE_API CborError cbor_value_copy_byte_string(const CborValue *value, uint8_t *buffer,
+                                                       size_t *buflen, CborValue *next)
+ {
++#ifdef HOST
+     assert(cbor_value_is_byte_string(value));
++#endif
+     return _cbor_value_copy_string(value, buffer, buflen, next);
+ }
+ 
+ CBOR_INLINE_API CborError cbor_value_dup_text_string(const CborValue *value, char **buffer,
+                                                      size_t *buflen, CborValue *next)
+ {
++#ifdef HOST
+     assert(cbor_value_is_text_string(value));
++#endif
+     return _cbor_value_dup_string(value, (void **)buffer, buflen, next);
+ }
+ CBOR_INLINE_API CborError cbor_value_dup_byte_string(const CborValue *value, uint8_t **buffer,
+                                                      size_t *buflen, CborValue *next)
+ {
++#ifdef HOST
+     assert(cbor_value_is_byte_string(value));
++#endif
+     return _cbor_value_dup_string(value, (void **)buffer, buflen, next);
+ }
+ 
+@@ -464,7 +489,9 @@
+ CBOR_INLINE_API CborError cbor_value_get_array_length(const CborValue *value, size_t *length)
+ {
+     uint64_t v;
++#ifdef HOST
+     assert(cbor_value_is_array(value));
++#endif
+     if (!cbor_value_is_length_known(value))
+         return CborErrorUnknownLength;
+     v = _cbor_value_extract_int64_helper(value);
+@@ -477,7 +504,9 @@
+ CBOR_INLINE_API CborError cbor_value_get_map_length(const CborValue *value, size_t *length)
+ {
+     uint64_t v;
++#ifdef HOST
+     assert(cbor_value_is_map(value));
++#endif
+     if (!cbor_value_is_length_known(value))
+         return CborErrorUnknownLength;
+     v = _cbor_value_extract_int64_helper(value);
+@@ -499,8 +528,10 @@
+ CBOR_INLINE_API CborError cbor_value_get_float(const CborValue *value, float *result)
+ {
+     uint32_t data;
++#ifdef HOST
+     assert(cbor_value_is_float(value));
+     assert(value->flags & CborIteratorFlag_IntegerValueTooLarge);
++#endif
+     data = (uint32_t)_cbor_value_decode_int64_internal(value);
+     memcpy(result, &data, sizeof(*result));
+     return CborNoError;
+@@ -511,8 +542,10 @@
+ CBOR_INLINE_API CborError cbor_value_get_double(const CborValue *value, double *result)
+ {
+     uint64_t data;
++#ifdef HOST
+     assert(cbor_value_is_double(value));
+     assert(value->flags & CborIteratorFlag_IntegerValueTooLarge);
++#endif
+     data = _cbor_value_decode_int64_internal(value);
+     memcpy(result, &data, sizeof(*result));
+     return CborNoError;
+diff --unified --recursive --no-dereference src/cborparser.c /home/pennam/Arduino/libraries/Arduino_CloudUtils/src/tinycbor/src/cborparser.c
+--- src/cborparser.c	2024-12-03 11:54:08.834581955 +0100
++++ /home/pennam/Arduino/libraries/Arduino_CloudUtils/src/tinycbor/src/cborparser.c	2024-12-03 11:32:10.790552470 +0100
+@@ -38,6 +38,9 @@
+ 
+ #include <string.h>
+ 
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wpedantic"
++
+ /**
+  * \defgroup CborParsing Parsing CBOR streams
+  * \brief Group of functions used to parse CBOR streams.
+@@ -1427,4 +1430,6 @@
+     return CborNoError;
+ }
+ 
++#pragma GCC diagnostic pop
++
+ /** @} */
+diff --unified --recursive --no-dereference src/cborparser_dup_string.c /home/pennam/Arduino/libraries/Arduino_CloudUtils/src/tinycbor/src/cborparser_dup_string.c
+--- src/cborparser_dup_string.c	2024-12-03 11:54:08.834581955 +0100
++++ /home/pennam/Arduino/libraries/Arduino_CloudUtils/src/tinycbor/src/cborparser_dup_string.c	2024-12-03 11:32:10.790552470 +0100
+@@ -36,6 +36,9 @@
+ #include "compilersupport_p.h"
+ #include <stdlib.h>
+ 
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wpedantic"
++
+ /**
+  * \fn CborError cbor_value_dup_text_string(const CborValue *value, char **buffer, size_t *buflen, CborValue *next)
+  *
+@@ -117,3 +120,5 @@
+     }
+     return CborNoError;
+ }
++
++#pragma GCC diagnostic pop
+diff --unified --recursive --no-dereference src/cborpretty.c /home/pennam/Arduino/libraries/Arduino_CloudUtils/src/tinycbor/src/cborpretty.c
+--- src/cborpretty.c	2024-12-03 11:54:08.834581955 +0100
++++ /home/pennam/Arduino/libraries/Arduino_CloudUtils/src/tinycbor/src/cborpretty.c	2024-12-03 11:32:10.790552470 +0100
+@@ -36,6 +36,9 @@
+ #include <inttypes.h>
+ #include <string.h>
+ 
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wpedantic"
++
+ /**
+  * \defgroup CborPretty Converting CBOR to text
+  * \brief Group of functions used to convert CBOR to text form.
+@@ -575,4 +578,6 @@
+     return value_to_pretty(streamFunction, token, value, flags, CBOR_PARSER_MAX_RECURSIONS);
+ }
+ 
++#pragma GCC diagnostic pop
++
+ /** @} */
+diff --unified --recursive --no-dereference src/cborpretty_stdio.c /home/pennam/Arduino/libraries/Arduino_CloudUtils/src/tinycbor/src/cborpretty_stdio.c
+--- src/cborpretty_stdio.c	2024-12-03 11:50:28.290577022 +0100
++++ /home/pennam/Arduino/libraries/Arduino_CloudUtils/src/tinycbor/src/cborpretty_stdio.c	2024-12-03 11:32:10.790552470 +0100
+@@ -26,6 +26,9 @@
+ #include <stdarg.h>
+ #include <stdio.h>
+ 
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wpedantic"
++
+ static CborError cbor_fprintf(void *out, const char *fmt, ...)
+ {
+     int n;
+@@ -85,3 +88,4 @@
+     return cbor_value_to_pretty_stream(cbor_fprintf, out, value, flags);
+ }
+ 
++#pragma GCC diagnostic pop
+diff --unified --recursive --no-dereference src/cbortojson.c /home/pennam/Arduino/libraries/Arduino_CloudUtils/src/tinycbor/src/cbortojson.c
+--- src/cbortojson.c	2024-12-03 11:54:08.834581955 +0100
++++ /home/pennam/Arduino/libraries/Arduino_CloudUtils/src/tinycbor/src/cbortojson.c	2024-12-03 11:32:10.790552470 +0100
+@@ -40,6 +40,9 @@
+ #include <stdlib.h>
+ #include <string.h>
+ 
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wpedantic"
++
+ /**
+  * \defgroup CborToJson Converting CBOR to JSON
+  * \brief Group of functions used to convert CBOR to JSON.
+@@ -696,4 +699,6 @@
+     return value_to_json(out, value, flags, cbor_value_get_type(value), &status);
+ }
+ 
++#pragma GCC diagnostic pop
++
+ /** @} */
+diff --unified --recursive --no-dereference src/cborvalidation.c /home/pennam/Arduino/libraries/Arduino_CloudUtils/src/tinycbor/src/cborvalidation.c
+--- src/cborvalidation.c	2024-12-03 11:54:08.834581955 +0100
++++ /home/pennam/Arduino/libraries/Arduino_CloudUtils/src/tinycbor/src/cborvalidation.c	2024-12-03 11:32:10.790552470 +0100
+@@ -45,6 +45,9 @@
+ #  define CBOR_PARSER_MAX_RECURSIONS 1024
+ #endif
+ 
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wpedantic"
++
+ /**
+  * \addtogroup CborParsing
+  * @{
+@@ -661,6 +664,8 @@
+     return CborNoError;
+ }
+ 
++#pragma GCC diagnostic pop
++
+ /**
+  * @}
+  */
+diff --unified --recursive --no-dereference src/open_memstream.c /home/pennam/Arduino/libraries/Arduino_CloudUtils/src/tinycbor/src/open_memstream.c
+--- src/open_memstream.c	2024-12-03 11:54:08.834581955 +0100
++++ /home/pennam/Arduino/libraries/Arduino_CloudUtils/src/tinycbor/src/open_memstream.c	2024-12-03 11:32:10.790552470 +0100
+@@ -32,21 +32,18 @@
+ #include <stdlib.h>
+ #include <string.h>
+ 
+-#if defined(__unix__) || defined(__APPLE__)
+-#  include <unistd.h>
+-#endif
+-#ifdef __APPLE__
+-typedef int RetType;
+-typedef int LenType;
+-#elif __GLIBC__
++#include <unistd.h>
++
+ typedef ssize_t RetType;
+ typedef size_t LenType;
+-#else
+-#  error "Cannot implement open_memstream!"
+-#endif
+ 
+ #include "compilersupport_p.h"
+ 
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wpedantic"
++#pragma GCC diagnostic ignored "-Wreturn-type"
++#pragma GCC diagnostic ignored "-Wunused-function"
++
+ struct Buffer
+ {
+     char **ptr;
+@@ -65,8 +62,8 @@
+         return -1;
+ 
+     if (newsize > b->alloc) {
+-        // make room
+-        size_t newalloc = newsize + newsize / 2 + 1;    // give 50% more room
++        /* make room */
++        size_t newalloc = newsize + newsize / 2 + 1;    /* give 50% more room */
+         ptr = realloc(ptr, newalloc);
+         if (ptr == NULL)
+             return -1;
+@@ -112,3 +109,4 @@
+ #endif
+ }
+ 
++#pragma GCC diagnostic pop
+Solo in src/: parsetags.pl
+Solo in src/: src.pri
+Solo in src/: tags.txt
+Solo in src/: tinycbor.pro
