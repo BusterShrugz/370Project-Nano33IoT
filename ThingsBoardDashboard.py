@@ -39,6 +39,7 @@ sock.setblocking(0)
 ecg_samples_batch = []
 sensors = {}
 
+    # Helper Functions
 def safe_float(x):
     try:
         if x is None:
@@ -62,6 +63,12 @@ def flush_ecg_to_csv(samples):
             f.flush()
     except Exception as e:
         print(f"Error writing to CSV: {e}")
+
+def ecg_batch_to_csv_string(ecg_batch):
+    if not ecg_batch:
+        return ""
+    valid_samples = [v for v in ecg_batch if not math.isnan(v)]
+    return ",".join([f"{v:.3f}" for v in valid_samples])
 
 
 print("Listening for ECG packets...")
@@ -115,7 +122,8 @@ try:
                 # Compute ECG Average, Ignoring NaN
             valid_samples = [v for v in ecg_samples_batch if not math.isnan(v)]
             ecg_avg = sum(valid_samples)/len(valid_samples) if valid_samples else float('nan')
-            sensors["ecg_avg"] = ecg_avg  # ensure avg is included
+            sensors["ecg_avg"] = ecg_avg                                                            # ensure avg is included
+            sensors["ecg_batch"] = ecg_batch_to_csv_string(ecg_samples_batch)
             
                 # Publish to ThingsBoard
             client.publish("v1/devices/me/telemetry", json.dumps(sensors, allow_nan=True))
