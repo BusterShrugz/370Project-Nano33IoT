@@ -3,7 +3,6 @@ import json
 import socket
 import select
 import paho.mqtt.client as mqtt
-import psutil
 import csv
 import os
 import math
