@@ -83,7 +83,6 @@ try:
             data, addr = sock.recvfrom(4096)
             decoded = data.decode().strip().split(",")
 
-            ecg_samples_batch.clear()     # Clear for new batch
             sensors.clear()               # Clear last readings
 
             for item in decoded:
@@ -127,6 +126,8 @@ try:
                 # Publish to ThingsBoard
             client.publish("v1/devices/me/telemetry", json.dumps(sensors, allow_nan=True))
             print(f"Sent To ThingsBoard GUI: {sensors}")
+
+            ecg_samples_batch.clear()
 
         time.sleep(0.001)
 
