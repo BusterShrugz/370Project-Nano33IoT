@@ -15,11 +15,11 @@ const char *wifiPASSes[] = {pass, passTwo, passHotSpot};
 const int wifiCount = sizeof(wifiSSIDs) / sizeof(wifiSSIDs[0]);
 
 // UDP setup
-// IPAddress piAddress(10, 0, 0, 120);     // Raspberry Pi IP OLD?
-// unsigned int udpPort = 5005;            // Ethan's port
+IPAddress piAddress(10, 0, 0, 120); // Raspberry Pi IP OLD?
+unsigned int udpPort = 5005;        // Ethan's port
 
-IPAddress piAddress(192, 168, 0, 23); // Reese's house Raspberry Pi IP
-unsigned int udpPort = 3333;          // Reese's port
+// IPAddress piAddress(192, 168, 0, 23); // Reese's house Raspberry Pi IP
+// unsigned int udpPort = 3333;          // Reese's port
 WiFiUDP Udp;
 
 // Sensors
@@ -288,6 +288,16 @@ void loop()
     // Only report stable HR if valid
     long stableSpO2 = validSPO2 ? smoothSpO2(spo2) : lastStableSpO2;
 
+    // Only report Max30105 data if finger is detected
+    if (!fingerPresent())
+    {
+      validHeartRate = 0;
+      validSPO2 = 0;
+      stableSpO2 = 0;
+      bpm = 0;
+      spo2 = 0;
+    }
+
     // Create UDP message
     char packet[700];
     int offset = 0;
@@ -298,11 +308,23 @@ void loop()
       offset += snprintf(packet + offset, sizeof(packet) - offset, "%.3f,", ecgBatch[i]);
     }
 
+    char avgECGBuffer[16];
+    const char *avgECGString;
+
+    if (isnan(avgECGVoltage))
+    {
+      avgECGString = "nan";
+    }
+    else
+    {
+      snprintf(avgECGBuffer, sizeof(avgECGBuffer), "%.2f", avgECGVoltage);
+      avgECGString = avgECGBuffer;
+    }
+
     // Temps, avgECG, BPM avgIR/Red and Sp02
     offset += snprintf(packet + offset, sizeof(packet) - offset,
-                       "amb:%.2f,obj:%.2f,avgECG:%.2f,BPM:%.2f,IR:%lu,RED:%lu,validHR:%d,SpO2:%ld,validSPO2:%d",
-                       ambientC, objectC,
-                       isnan(avgECGVoltage) ? "nan" : String(avgECGVoltage, 2).c_str(),
+                       "amb:%.2f,obj:%.2f,avgECG:%s,BPM:%.2f,IR:%lu,RED:%lu,validHR:%d,SpO2:%ld,validSPO2:%d",
+                       ambientC, objectC, avgECGString,
                        bpm, (unsigned long)avgIR, (unsigned long)avgRed,
                        validHeartRate, stableSpO2, validSPO2);
 
@@ -502,4 +524,10 @@ void connectToBestWiFi()
     Serial.println("\nFailed - Attempting to connect to next WiFi option. ");
   }
   Serial.println("ERROR!! Could not connect to any network via WiFi.");
+}
+
+bool fingerPresent()
+{
+  uint32_t irValue = particleSensor.getIR();
+  return (irValue > 20000 && irValue < 100000); // typical finger range
 }
