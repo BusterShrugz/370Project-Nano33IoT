@@ -13,8 +13,8 @@ ACCESS_TOKEN = "d4o0zhyonwl93gagkbsd"
 
    # UDP Config
 UDP_IP = "0.0.0.0"
-# UDP_PORT = 5005
-UDP_PORT = 3333 # Reese's port
+UDP_PORT = 5005 # Ethan's port
+# UDP_PORT = 3333 # Reese's port
 
     # CSV File Setup
 CSV_FILE = "ecg_data.csv"
@@ -31,12 +31,18 @@ client.loop_start()
 
     # UDP Socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock.bind((UDP_IP, UDP_PORT))
+try:
+    sock.bind((UDP_IP, UDP_PORT))
+    print(f"UDP socket bound to {UDP_IP}:{UDP_PORT}")
+except Exception as e:
+    print("Failed to bind UDP socket:", e)
+    exit(1)
 sock.setblocking(0)
 
     # Storage Variables
 ecg_samples_batch = []
 sensors = {}
+last_publish = time.time()
 
     # Helper Functions
 def safe_float(x):
@@ -69,11 +75,11 @@ def ecg_batch_to_csv_string(ecg_batch):
     valid_samples = [v for v in ecg_batch if not math.isnan(v)]
     return ",".join([f"{v:.3f}" for v in valid_samples])
 
+def sanitize_data(data):
+    return {k: v for k, v in data.items() if v is not None and not (isinstance(v, float) and math.isnan(v))}
+
 
 print("Listening for ECG packets...")
-
-    # Aggregation Timer
-last_publish = time.time()
 
 try:
     while True:
@@ -81,15 +87,20 @@ try:
         ready = select.select([sock], [], [], 0.05)
         if ready[0]:
             data, addr = sock.recvfrom(4096)
-            decoded = data.decode().strip().split(",")
-
-            sensors.clear()               # Clear last readings
+            raw_packet = data.decode()
+            print("RAW UDP PACKET:", raw_packet) 
+            decoded = raw_packet.strip().split(",")
 
             for item in decoded:
                 if ":" in item:
                     key, val = item.split(":")
                     val = safe_float(val)
                     sensors[key] = val 
+
+                    if key == "validSPO2" and val == 0: #SPO2 Flag
+                        sensors["SpO2"] = float('nan')
+                    if key == "validHR" and val == 0:   #BPM Flag
+                        sensors["BPM"] = float('nan')
                     
                     if key == "amb":           # MLX Ambient Temp / Converts to F
                         sensors["ambient_f"] = (val * 9/5 + 32) if val is not None else None
@@ -110,7 +121,7 @@ try:
                     val = safe_float(item)
                     ecg_samples_batch.append(val)
 
-                # Save ECG Batch to CSV       
+                 # Save ECG Batch to CSV       
             flush_ecg_to_csv(ecg_samples_batch)
             
             # Publish Aggregated Telemetry Every 1 Sec
@@ -122,9 +133,10 @@ try:
             ecg_avg = sum(valid_samples)/len(valid_samples) if valid_samples else float('nan')
             sensors["ecg_avg"] = ecg_avg                                                            # ensure avg is included
             sensors["ecg_batch"] = ecg_batch_to_csv_string(ecg_samples_batch)
+            sensors = sanitize_data(sensors)
             
                 # Publish to ThingsBoard
-            client.publish("v1/devices/me/telemetry", json.dumps(sensors, allow_nan=True))
+            client.publish("v1/devices/me/telemetry", json.dumps(sensors))
             print(f"Sent To ThingsBoard GUI: {sensors}")
 
             ecg_samples_batch.clear()

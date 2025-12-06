@@ -16,7 +16,8 @@ const int wifiCount = sizeof(wifiSSIDs) / sizeof(wifiSSIDs[0]);
 
 // UDP setup
 IPAddress piAddress(10, 0, 0, 120); // Raspberry Pi IP OLD?
-unsigned int udpPort = 5005;        // Ethan's port
+IPAddress laptopAddress(10, 0, 0, 173);
+unsigned int udpPort = 5005; // Ethan's port
 
 // IPAddress piAddress(192, 168, 0, 23); // Reese's house Raspberry Pi IP
 // unsigned int udpPort = 3333;          // Reese's port
@@ -328,8 +329,13 @@ void loop()
                        bpm, (unsigned long)avgIR, (unsigned long)avgRed,
                        validHeartRate, stableSpO2, validSPO2);
 
-    // Sending packet
+    // Sending packet to pi
     Udp.beginPacket(piAddress, udpPort);
+    Udp.write(packet);
+    Udp.endPacket();
+
+    // Sending packet to laptop
+    Udp.beginPacket(laptopAddress, udpPort);
     Udp.write(packet);
     Udp.endPacket();
 
@@ -490,40 +496,43 @@ void updateStatusLED()
 
 void connectToBestWiFi()
 {
-  Serial.println("\nIoT Vital Monitor Starting... \nPlease wait...");
+  Serial.println("\nIoT Vital Monitor Starting... Please wait...");
 
-  for (int i = 0; i < wifiCount; i++)
+  while (true)
   {
-    // Skip the hotspot until we set it up
-    if (strlen(wifiSSIDs[i]) == 0)
-      continue;
-
-    Serial.print("Testing available WiFi: ");
-    Serial.println(wifiSSIDs[i]);
-
-    WiFi.begin(wifiSSIDs[i], wifiPASSes[i]);
-
-    unsigned long startAttempt = millis();
-    const unsigned long timeout = 8000; // Waiting 8 seconds and if none available switching to next wifi
-
-    while (WiFi.status() != WL_CONNECTED &&
-           millis() - startAttempt < timeout)
+    for (int i = 0; i < wifiCount; i++)
     {
-      Serial.print(".");
-      delay(500);
-    }
-    if (WiFi.status() == WL_CONNECTED)
-    {
-      Serial.println("\n ^(0.0)> Connected Successfully! <(0_0)^");
-      Serial.print("Connected to SSID: ");
+      if (strlen(wifiSSIDs[i]) == 0)
+        continue;
+
+      Serial.print("Trying WiFi: ");
       Serial.println(wifiSSIDs[i]);
-      Serial.print("IP Address: ");
-      Serial.println(WiFi.localIP());
-      return;
+
+      WiFi.begin(wifiSSIDs[i], wifiPASSes[i]);
+
+      unsigned long startAttempt = millis();
+      const unsigned long attemptTimeout = 15000; // 15 seconds per network
+
+      while (WiFi.status() != WL_CONNECTED && (millis() - startAttempt) < attemptTimeout)
+      {
+        Serial.print(".");
+        delay(500);
+      }
+
+      if (WiFi.status() == WL_CONNECTED)
+      {
+        Serial.println("\nConnected!");
+        Serial.print("IP Address: ");
+        Serial.println(WiFi.localIP());
+        return;
+      }
+
+      Serial.println("\nFailed to connect to " + String(wifiSSIDs[i]) + " — next network");
     }
-    Serial.println("\nFailed - Attempting to connect to next WiFi option. ");
+
+    Serial.println("All networks failed — retrying in 1 second...");
+    delay(1000);
   }
-  Serial.println("ERROR!! Could not connect to any network via WiFi.");
 }
 
 bool fingerPresent()
